@@ -26,7 +26,8 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
     public static int NEXUS7_WIDTH = 0;
     public static int NEXUS7_HEIGHT = 0;
     private SurfaceHolder mHolder;
-    private int mGameState; // ゲームの状態を表す変数
+    private int mGameState; //ゲームの状態を表す変数
+    private int mScore = 0; //スコア
 
 
     /**
@@ -95,6 +96,8 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
      * @return
      */
     public boolean onTouchEvent(MotionEvent event) {
+        NEXUS7_WIDTH = MainActivity.getViewWidth();
+        NEXUS7_HEIGHT = MainActivity.getViewHeight();
         int action = event.getAction();
         int x = (int) event.getX();
         int y = (int) event.getY();
@@ -130,8 +133,8 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
         //String msg = null;
         Paint paint = new Paint();
         paint.setTextSize(30);
-        NEXUS7_WIDTH = MainActivity.getViewWidth(); //SpeedCardView の幅を取得：いろいろな端末に対応
-        NEXUS7_HEIGHT = MainActivity.getViewHeight();//SpeedCardView の高さを取得：いろいろな端末に対応
+        NEXUS7_WIDTH = MainActivity.getViewWidth();
+        NEXUS7_HEIGHT = MainActivity.getViewHeight();
 
         switch (mGameState) { //ゲームの状態によって処理を振り分ける
             case OPENING:
@@ -139,9 +142,10 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
                 writeStartButton(canvas, paint); //スタートボタンの描画
                 break;
             case GAMEPLAY:
-                canvas.drawText("SCORE:", 10, 50, paint);
+                canvas.drawText("SCORE:"+ getScore(), 10, 50, paint);
                 break;
             case RESULT:
+                canvas.drawText("FINAL SCORE:"+ getScore(), 10, 50, paint);
                 break;
         }
         mHolder.unlockCanvasAndPost(canvas); // サーフェースのロックを外す
@@ -171,8 +175,10 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
 
         switch (mGameState) {
             case OPENING:
+                mScore = 0;
                 break;
             case GAMEPLAY:
+                ScorePlus(1);
                 break;
             case RESULT:
                 break;
@@ -180,4 +186,12 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
         // end of switch
         draw();
     } //end of if
+
+    public int getScore() {
+        return mScore;
+    }
+
+    public void ScorePlus(int point) {
+        this.mScore += point;
+    }
 }
