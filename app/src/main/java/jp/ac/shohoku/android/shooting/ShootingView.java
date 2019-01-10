@@ -108,14 +108,27 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
                     case OPENING:
                         if(NEXUS7_WIDTH/2-150 < x && x < NEXUS7_WIDTH/2+150
                                 && NEXUS7_HEIGHT/2-90 < y && y < NEXUS7_HEIGHT/2-40){ //ボタンの内部
+                            mPlayer = new Player(this);
                             mGameState = GAMEPLAY;
                         }
                         break;
                     case GAMEPLAY:
-                        mGameState = RESULT;
+                        //mGameState = RESULT;
+                        mPlayer.move(x,y);
                         break;
                     case RESULT:
                         mGameState = OPENING;
+                        break;
+                }
+                break;
+            case MotionEvent.ACTION_MOVE:
+                switch (mGameState) { //ゲームの状態によって処理を振り分ける
+                    case OPENING:
+                        break;
+                    case GAMEPLAY:
+                        mPlayer.move(x,y);
+                        break;
+                    case RESULT:
                         break;
                 }
                 break;
@@ -146,7 +159,6 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
                 writeStartButton(canvas, paint); //スタートボタンの描画
                 break;
             case GAMEPLAY:
-                mPlayer = new Player(this);
                 mPlayer.draw(canvas);
                 canvas.drawText("SCORE:"+ getScore(), SCREEN_EDGE + 10, 50, paint);
                 break;
