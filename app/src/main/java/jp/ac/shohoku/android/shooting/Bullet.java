@@ -24,7 +24,28 @@ public class Bullet extends BaseObject{
     }
 
     @Override
+    public void move() {
+        yPosition -= 1 *MOVE_WEIGHT;
+        xPosition += alignX * MOVE_WEIGHT;
+    }
+
+    @Override
+    public boolean isHit(BaseObject object) {
+        return false;
+    }
+
+    @Override
     public void draw(Canvas canvas) {
+        if (state != STATE_NORMAL) {
+            return;
+        }
         canvas.drawCircle(xPosition, yPosition, SIZE, paint);
+    }
+
+
+
+    @Override
+    public Type getType() {
+        return Type.Bullet;
     }
 }

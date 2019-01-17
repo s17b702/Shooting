@@ -30,6 +30,23 @@ public class Missile extends BaseObject{
 
     @Override
     public void draw(Canvas canvas) {
+        if (state != STATE_NORMAL) {
+            return;
+        }
         canvas.drawCircle(xPosition, yPosition, SIZE, paint);
+    }
+
+    @Override
+    public boolean isHit(BaseObject object) {
+        if (object.getType() == Type.Missile) {
+            return false;
+        }
+
+        return  (calcDistance(this, object) < SIZE);
+    }
+
+    @Override
+    public Type getType() {
+        return Type.Missile;
     }
 }

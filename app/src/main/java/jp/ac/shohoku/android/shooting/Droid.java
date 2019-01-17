@@ -28,11 +28,21 @@ public class Droid extends BaseObject {
     }
 
     @Override
+    public Type getType() {
+        return null;
+    }
+
+    @Override
     public  void draw(Canvas canvas) {
         canvas.drawBitmap(bitmap, rect.left, rect.top, paint);
     }
 
     @Override
     public void move(){
+    }
+
+    @Override
+    public boolean isHit(BaseObject object) {
+        return false;
     }
 }

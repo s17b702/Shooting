@@ -5,29 +5,63 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;r
+import android.graphics.Paint;
 
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
+import android.view.MotionEvent;
+
+import android.os.Handler;
+import android.os.Vibrator;
+
+import java.awt.PageAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static javax.swing.UIManager.get;
+
 public class GameView extends SurfaceView implements SurfaceHolder.Callback {
+    
+    public interface EventCallback {
+        void onGameOver(long score);
+    }
+    
+    private EventCallback eventCallback;
+    public void setEventCallback(EventCallback eventCallback) {
+        this.eventCallback = eventCallback;
+    }
+    
+    private  Handler handler = new Handler();
 
     private static final  long DRAW_INTERVAL = 1000 /60;
 
-    private  static final int MISSILE_LAUNCH_WEIGHT = 50;
+    private static final int MISSILE_LAUNCH_WEIGHT = 50;
+    
+    private static  final float SCORE_TEXT_SIZE = 60.0f; 
+    
+    private static final long VIBRATION_LENGTH_HIT_MISSILE = 100;
+    private static final long VIBRATION_LENGTH_HIT_DROID = 1000;
+    private static final int SCORE_LEVEL = 100;
 
     private Droid droid;
     private final List<BaseObject> missileList = new ArrayList<>();
+    private  final List<BaseObject> bulletList = new ArrayList<>();
 
     private  final Random rand = new Random(System.currentTimeMillis());
+    
+    
+    private long score;
+    private final Paint PaintScore = new Paint();
 
     private  DrawThread drawThread;
 
     private class DrawThread extends Thread {
         private final AtomicBoolean isFinished = new AtomicBoolean();
+
+        public void Finish() {
+        }
     }
 
     public void finish() {
@@ -52,7 +86,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
 
             synchronized (this) {
                 try {
-                    wait(DRAM_INTERVAL);
+                    wait(DRAW_INTERVAL);
                 } catch (InterruptedException e) {
 
                 }
@@ -79,6 +113,11 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     }
 
     @Override
+    public void surfaceCreated(SurfaceHolder surfaceHolder) {
+        startDrawThread();
+    }
+
+    @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
     }
 
@@ -86,9 +125,18 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     public void surfaceDestroyed(SurfaceHolder holder) {
         stopDrawThread();
     }
+    
+    private final Vibrator vibrator;
 
     public GameView(Context context) {
         super(context);
+        
+        vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE); 
+        
+        PaintScore.setColor(Color.BLACK);
+        PaintScore.setTextSize(SCORE_TEXT_SIZE);
+        PaintScore.setAntiAlias(true);
+        
         getHandler().addCallback(this);
     }
 
@@ -99,16 +147,58 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
 
         if(droid == null) {
             Bitmap droidBitmap = BitmapFactory.decodeResource(getResources(),
-                       R.drawable.droid);
+                       R.drawable.doroid);
             droid = new Droid(droidBitmap, width, height);
         }
 
         if(rand.nextInt(MISSILE_LAUNCH_WEIGHT) == 0) {
-            Missile missile = launchMissile(width, height);
-            missileList.add(missile);
+            long count = score / SCORE_LEVEL + 1;
+            for (int i = 0; i < count; i++) {
+                Missile missile = launchMissile(width, height);
+                missileList.add(missile);
+            }
+        }
+
+        drawObjectList(canvas, missileList, width, height);
+
+        drawObjectList(canvas, bulletList, width, height);
+        
+        for (int i = 0; i < missileList.size(); i++) {
+            BaseObject missile = missileList.get(i);
+            
+            if (droid.isHit(missile)) {
+                missile.hit();
+                droid.hit();
+                
+                vibrator.vibrate(VIBRATION_LENGTH_HIT_DROID);
+                
+                handler.post(new Runnable () {
+                    @Override
+                    public void  run() {
+                        eventCallback.onGameOver(score);
+                    }
+                });
+                
+                break;
+            }
+            
+            for (int j = 0; j< bulletList.size(); j++){
+                BaseObject bulletList.get(j);
+                
+                if (bulletList.isHit(missile)) {
+                    missile.hit();
+                    bulletList.hit();
+                    
+                    vibrator.vibrate(VIBRATION_LENGTH_HIT_MISSILE);
+                    
+                    score += 10;
+                }
+            }
         }
 
         droid.draw(canvas);
+        
+        canvas.drawText("Score:" + score, 0, SCORE_TEXT_SIZE,PaintScore);
     }
 
     private static void drawObjectList(
@@ -123,6 +213,23 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
                 i--;
             }
         }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                fire(event.getX(), event.getY());
+                break;
+        }
+        return super.onTouchEvent(event);
+    }
+
+    private void  fire(float x, float y) {
+        float alignX = (x - droid.rect.centerX()) / Math.abs(y - droid.rect.centerY());
+
+        Bullet bullet = new Bullet(droid.rect, alignX);
+        bulletList.add(0, bullet);
     }
 
     private Missile launchMissile(int width, int height) {
