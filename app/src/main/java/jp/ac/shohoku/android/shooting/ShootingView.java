@@ -1,6 +1,9 @@
 package jp.ac.shohoku.android.shooting;
 
 import android.content.Context;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -11,6 +14,9 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceHolder.Callback;
 import android.view.SurfaceView;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -21,10 +27,17 @@ import java.util.concurrent.TimeUnit;
 public class ShootingView extends SurfaceView implements Runnable, Callback {
 
     Player mPlayer;
+    Enemy mEnemy;
+    Bullet mBullet;
+    Bitmap mBackGround;
+    private final List<Enemy> EnemyList = new ArrayList<>();
+    private final List<Bullet> BulletList = new ArrayList<>();
 
     public static final int OPENING = 0;  //オープニング画面
     public static final int GAMEPLAY = 1; //ゲーム画面
     public static final int RESULT = 2;   //リザルト画面
+    public  static  final int TYPE_PLAYER = 0;
+    public  static  final int TYPE_ENEMY = 1;
 
     public static final int SCREEN_EDGE = 0;  //画面
     public static int NEXUS7_WIDTH = 0;
@@ -32,6 +45,8 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
     private SurfaceHolder mHolder;
     private int mGameState; //ゲームの状態を表す変数
     private int mScore = 0; //スコア
+    private int mHighScore = 0; //ハイスコア
+    private  final Random rand = new Random(System.currentTimeMillis());
 
     /**
      * コンストラクタ<br />
@@ -53,7 +68,7 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
         mHolder.addCallback(this);
         setFocusable(true); // フォーカスをあてることを可能にするメソッド
         requestFocus(); // フォーカスを要求して実行を可能にする
-        mGameState = OPENING; //最初は OPENING 表示画面
+        StateChange(OPENING); //最初は OPENING 表示画面
     }
 
     /**
@@ -106,18 +121,26 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
             case MotionEvent.ACTION_DOWN: //画面上で押下されたとき
                 switch (mGameState) { //ゲームの状態によって処理を振り分ける
                     case OPENING:
-                        if(NEXUS7_WIDTH/2-150 < x && x < NEXUS7_WIDTH/2+150
-                                && NEXUS7_HEIGHT/2-90 < y && y < NEXUS7_HEIGHT/2-40){ //ボタンの内部
-                            mPlayer = new Player(this);
-                            mGameState = GAMEPLAY;
+                        //if(NEXUS7_WIDTH/2-150 < x && x < NEXUS7_WIDTH/2+150 && NEXUS7_HEIGHT/2-90 < y && y < NEXUS7_HEIGHT/2-40){ //ボタンの内部
+                        //}
+                        mPlayer = new Player(this);
+                        for(int i = 0; i < EnemyList.size(); i++) { //エネミーのリセット
+                            Enemy object = EnemyList.get(i);
+                            EnemyList.remove(object);
+                            i--;
                         }
+                        for(int i = 0; i < BulletList.size(); i++) { //弾のリセット
+                            Bullet object = BulletList.get(i);
+                            BulletList.remove(object);
+                            i--;
+                        }
+                        StateChange(GAMEPLAY);
                         break;
                     case GAMEPLAY:
-                        //mGameState = RESULT;
                         mPlayer.move(x,y);
                         break;
                     case RESULT:
-                        mGameState = OPENING;
+                        StateChange(OPENING);
                         break;
                 }
                 break;
@@ -127,6 +150,18 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
                         break;
                     case GAMEPLAY:
                         mPlayer.move(x,y);
+                        break;
+                    case RESULT:
+                        break;
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+                switch (mGameState) { //ゲームの状態によって処理を振り分ける
+                    case OPENING:
+                        break;
+                    case GAMEPLAY:
+                        mBullet = new Bullet(mPlayer.getPlayerLocation(),mPlayer.getRadian(),40,TYPE_PLAYER);
+                        BulletList.add(mBullet);
                         break;
                     case RESULT:
                         break;
@@ -143,45 +178,46 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
     private void draw() {
         Canvas canvas = mHolder.lockCanvas(); // サーフェースをロック
         canvas.drawColor(Color.WHITE); // キャンバスを白に塗る
-        //String msg = null;
         Paint paint = new Paint();
-        paint.setTextSize(60);
         NEXUS7_WIDTH = MainActivity.getViewWidth();
         NEXUS7_HEIGHT = MainActivity.getViewHeight();
-
+        paint.setTextSize(60);
+        paint.setColor(Color.WHITE);
         paint.setStyle(Paint.Style.FILL_AND_STROKE);
         canvas.drawRect(0, 0, SCREEN_EDGE, NEXUS7_HEIGHT, paint);
         canvas.drawRect(NEXUS7_WIDTH - SCREEN_EDGE, 0, NEXUS7_WIDTH, NEXUS7_HEIGHT, paint);
-
+        Resources rs = this.getContext().getResources(); //リソースを取得
+        Bitmap bmp;
         switch (mGameState) { //ゲームの状態によって処理を振り分ける
             case OPENING:
-                //オープニング画面の表示
-                writeStartButton(canvas, paint); //スタートボタンの描画
+                bmp = BitmapFactory.decodeResource(rs, R.mipmap.title);
+                mBackGround = Bitmap.createScaledBitmap(bmp, NEXUS7_WIDTH + 1, NEXUS7_HEIGHT + 1, false);
+                canvas.drawBitmap(mBackGround,0, 0, paint);
+                int x = NEXUS7_WIDTH/2 - 210;
+                int y = NEXUS7_HEIGHT/2 + 190;
+                canvas.drawText("TOUCH  SCREEN", x, y, paint);
+                canvas.drawText("HIGH SCORE:"+ mHighScore, x, y + 120, paint);
                 break;
             case GAMEPLAY:
+                bmp = BitmapFactory.decodeResource(rs, R.mipmap.background);
+                mBackGround = Bitmap.createScaledBitmap(bmp, NEXUS7_WIDTH + 1, NEXUS7_HEIGHT + 1, false);
+                canvas.drawBitmap(mBackGround,0, 0, paint);
                 mPlayer.draw(canvas);
-                canvas.drawText("SCORE:"+ getScore(), SCREEN_EDGE + 10, 50, paint);
+                Rect PLoc = mPlayer.getPlayerLocation(); //プレイヤーの位置計算
+                int centerX = PLoc.left + PLoc.right / 2;
+                int centerY = PLoc.top + PLoc.bottom / 2;
+                drawEnemy(canvas,EnemyList,centerX,centerY);
+                drawBullet(canvas,BulletList,NEXUS7_WIDTH,NEXUS7_HEIGHT);
+                canvas.drawText("SCORE:"+ mScore, SCREEN_EDGE + 10, 50, paint);
                 break;
             case RESULT:
-                canvas.drawText("SCORE:"+ getScore(), SCREEN_EDGE + 10, 50, paint);
+                bmp = BitmapFactory.decodeResource(rs, R.mipmap.gameover);
+                mBackGround = Bitmap.createScaledBitmap(bmp, NEXUS7_WIDTH + 1, NEXUS7_HEIGHT + 1, false);
+                canvas.drawBitmap(mBackGround,0, 0, paint);
+                canvas.drawText("SCORE:"+ mScore, SCREEN_EDGE + 10, 50, paint);
                 break;
         }
         mHolder.unlockCanvasAndPost(canvas); // サーフェースのロックを外す
-    }
-
-    /**
-     * スタートボタンの表示
-     * @param canvas
-     * @param paint
-     */
-    private void writeStartButton(Canvas canvas, Paint paint) {
-        int left = NEXUS7_WIDTH/2 - 150;
-        int top = NEXUS7_HEIGHT/2 - 90;
-        int right = left + 250;
-        int bottom = top + 65;
-        paint.setStyle(Paint.Style.STROKE);
-        canvas.drawRect(left, top, right, bottom, paint);
-        canvas.drawText("START", left + 30, bottom - 10, paint);
     }
 
     /*
@@ -190,13 +226,65 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
      * @see java.lang.Runnable#run()
      */
     public void run() {
-
         switch (mGameState) {
             case OPENING:
                 mScore = 0;
                 break;
             case GAMEPLAY:
-                ScorePlus(1);
+                if(ScoreRand(mScore/100 + 9500) == 0) { //エネミーのスポーン
+                    long count = mScore / 10000 + 1;
+                    for (int i = 0; i < count; i++) {
+                        int Speed = 3;
+                        if(ScoreRand(mScore * 100) == 0){
+                            Speed = 8;
+                        } else if(ScoreRand(mScore * 10) <= 2){
+                            Speed = 7;
+                        } else if(ScoreRand(mScore * 10) <= 3){
+                            Speed = 6;
+                        } else if(ScoreRand(mScore * 10) <= 4){
+                            Speed = 5;
+                        } else if(ScoreRand(mScore * 10) <= 5){
+                            Speed = 4;
+                        }
+                        mEnemy = new Enemy(this,rand.nextInt(NEXUS7_WIDTH),rand.nextInt(NEXUS7_HEIGHT),Speed);
+                        EnemyList.add(mEnemy);
+                    }
+                }
+                Rect PRect = mPlayer.getPlayerLocation();
+                for(int i = 0; i < EnemyList.size(); i++) { //エネミーの処理
+                    Enemy Enemy = EnemyList.get(i);
+                    Rect ERect = Enemy.getEnemyLocation();
+                    if(calcDistance(PRect,ERect) < 2f){ //プレイヤーがエネミーに当たった時
+                        StateChange(RESULT);
+                    }
+                    if(ScoreRand(mScore * 10) <= 20) { //エネミーの弾発射
+                        if(ScoreRand(mScore) <= mScore/50000) {
+                            mBullet = new Bullet(Enemy.getEnemyLocation(), Enemy.getRadian(), 15, TYPE_ENEMY);
+                            BulletList.add(mBullet);
+                        }
+                    }
+                }
+                for(int i = 0; i < BulletList.size(); i++) { //弾の処理
+                    Bullet Bullet = BulletList.get(i);
+                    int posX = Bullet.getPositionX();
+                    int posY = Bullet.getPositionY();
+                    Rect BRect = new Rect(posX + 40, posY + 40, 30,30);
+                    if(calcDistance(PRect,BRect) < 50f && Bullet.getType() == TYPE_ENEMY){ //プレイヤーが弾に当たった時
+                        StateChange(RESULT);
+                    }
+                    for(int j = 0; j < EnemyList.size(); j++) {
+                        Enemy Enemy = EnemyList.get(j);
+                        Rect ERect = Enemy.getEnemyLocation();
+                        if(calcDistance(ERect,BRect) < 50f && Bullet.getType() == TYPE_PLAYER){ //エネミーが弾に当たった時
+                            EnemyList.remove(Enemy);
+                            ScorePlus(200);
+                            j--;
+                            BulletList.remove(Bullet);
+                            i--;
+                            break;
+                        }
+                    }
+                }
                 break;
             case RESULT:
                 break;
@@ -205,11 +293,53 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
         draw();
     } //end of if
 
-    public int getScore() {
-        return mScore;
+    /**
+     * 2つのオブジェクトの距離を計算
+     * @param obj1 オブジェクト1
+     * @param obj2 オブジェクト2
+     * @return オブジェクト同士の距離
+     */
+    public double calcDistance(Rect obj1, Rect obj2) {
+        float distX = obj1.centerX() - obj2.centerX();
+        float distY = obj1.centerY() - obj2.centerY();
+        return Math.sqrt(Math.pow(distX, 2) + Math.pow(distY, 2));
+    }
+
+    private static void drawBullet(Canvas canvas, List<Bullet> objectList, int widht, int height){
+        for(int i = 0; i < objectList.size(); i++) {
+            Bullet object = objectList.get(i);
+            if(object.isAvailable(widht, height)) {
+                object.move();
+                object.draw(canvas);
+            } else {
+                objectList.remove(object);
+                i--;
+            }
+        }
+    }
+
+    private static void drawEnemy(Canvas canvas, List<Enemy> objectList, int x, int y){
+        for(int i = 0; i < objectList.size(); i++) {
+            Enemy object = objectList.get(i);
+            object.move(x,y);
+            object.draw(canvas);
+        }
     }
 
     public void ScorePlus(int point) {
         this.mScore += point;
+    }
+
+    private void StateChange(int state){
+        mGameState = state;
+        if(state == RESULT && mScore > mHighScore){
+            mHighScore = mScore;
+        }
+    }
+
+    private int ScoreRand(int score){
+        int random = 1000 - score / 10;
+        if (random <= 30){ random = 30; }
+        return rand.nextInt(random);
     }
 }

@@ -9,7 +9,6 @@
     <jp.ac.shohoku.android.shooting.ShootingView
         android:id="@+id/ShootingView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        />
+        android:layout_height="match_parent" />
 
 </android.support.constraint.ConstraintLayout>

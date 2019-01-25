@@ -5,28 +5,30 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
-import android.widget.ImageView;
 
 public class Player {
-    private Bitmap mBmp;
+    private Bitmap mBmp, mRotatedBmp;
     private Rect mPlayerLocation;
     private int mW, mH;
     private int mX, mY; //位置
     private float mVx, mVy; //速度
     private final int V=10;
     private double mRotation = 0;
+    private double mRadian;
 
     /**
-     * カードのコンストラクタ
+     * プレイヤーのコンストラクタ
      * @param sview リソースを読み込むため、ShootingViewを読み込む
      */
     public Player(ShootingView sview) {
         Resources rs = sview.getResources(); //リソースを取得
         Context context = sview.getContext(); //パッケージ名を取得するためにContextを取得
-        int resId = rs.getIdentifier("player1", "mipmap", context.getPackageName());
+        int resId = rs.getIdentifier("player", "mipmap", context.getPackageName());
         mBmp  = BitmapFactory.decodeResource(rs, resId); //画像を取得
+        mRotatedBmp = mBmp;
         mW = mBmp.getWidth();
         mH = mBmp.getHeight();
         int wCenter = ShootingView.NEXUS7_WIDTH / 2;
@@ -35,9 +37,9 @@ public class Player {
         mX = mPlayerLocation.left;
         mY = mPlayerLocation.top;
         mRotation = 0;
-        double radian = mRotation*Math.PI/180;
-        mVx = (float)Math.cos(radian-Math.PI/2)*V; //画面下から上がデフォルトの進行方向なので-PI/2
-        mVy = (float)Math.sin(radian-Math.PI/2)*V;
+        mRadian = mRotation*Math.PI/180;
+        mVx = (float)Math.cos(mRadian-Math.PI/2)*V; //画面下から上がデフォルトの進行方向なので-PI/2
+        mVy = (float)Math.sin(mRadian-Math.PI/2)*V;
     }
 
     /**
@@ -51,13 +53,17 @@ public class Player {
         mPlayerLocation = new Rect(left, top, right, bottom);
     }
 
+    public Rect getPlayerLocation() {
+        return mPlayerLocation;
+    }
+
     /**
      * プレイヤーの画像を描画する
      * @param canvas
      */
     public void draw(Canvas canvas) {
         if (mBmp != null) {
-            canvas.drawBitmap(mBmp, mX, mY, new Paint()); //プレイヤーの描画
+            canvas.drawBitmap(mRotatedBmp, mX, mY, new Paint()); //プレイヤーの描画
         }
     }
 
@@ -70,11 +76,20 @@ public class Player {
         mRotation = 0;
         int centerX = mPlayerLocation.left + mPlayerLocation.right / 2; //プレイヤーの位置
         int centerY = mPlayerLocation.top + mPlayerLocation.bottom / 2;
-        double radian = Math.atan2(centerY - y, centerX - x); //タップした位置とプレイヤーの位置との角度
-        mVx = (float)Math.cos(radian)*V;
-        mVy = (float)Math.sin(radian)*V;
+        mRadian = Math.atan2(centerY - y, centerX - x); //タップした位置とプレイヤーの位置との角度
+        float PI = (float) Math.PI;
+        float degree = (float)mRadian* 180 / PI - 90;
+        Matrix matrix = new Matrix();
+        matrix.postRotate(degree, mW, mH);
+        mRotatedBmp = Bitmap.createBitmap(mBmp, 0, 0, mW, mH, matrix,true);
+        mVx = (float)Math.cos(mRadian)*V;
+        mVy = (float)Math.sin(mRadian)*V;
         mX -= mVx;
         mY -= mVy;
         setPlayerLocation(mX,mY, mW, mH);
+    }
+
+    public double getRadian() {
+        return mRadian;
     }
 }
