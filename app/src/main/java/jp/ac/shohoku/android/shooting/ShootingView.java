@@ -8,6 +8,9 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.SoundPool;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
@@ -36,8 +39,12 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
     public static final int OPENING = 0;  //オープニング画面
     public static final int GAMEPLAY = 1; //ゲーム画面
     public static final int RESULT = 2;   //リザルト画面
-    public  static  final int TYPE_PLAYER = 0;
-    public  static  final int TYPE_ENEMY = 1;
+    public static final int TYPE_PLAYER = 0;
+    public static final int TYPE_ENEMY = 1;
+
+    private MediaPlayer mBGM1,mBGM2,mBGM3;
+    private SoundPool mSoundPool;
+    public int Tap_SE,P_Bullet,P_Destroy,E_Bullet,E_Destroy; //効果音用の ID
 
     public static final int SCREEN_EDGE = 0;  //画面
     public static int NEXUS7_WIDTH = 0;
@@ -46,7 +53,7 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
     private int mGameState; //ゲームの状態を表す変数
     private int mScore = 0; //スコア
     private int mHighScore = 0; //ハイスコア
-    private  final Random rand = new Random(System.currentTimeMillis());
+    private final Random rand = new Random(System.currentTimeMillis());
 
     /**
      * コンストラクタ<br />
@@ -68,6 +75,7 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
         mHolder.addCallback(this);
         setFocusable(true); // フォーカスをあてることを可能にするメソッド
         requestFocus(); // フォーカスを要求して実行を可能にする
+        SoundInit();
         StateChange(OPENING); //最初は OPENING 表示画面
     }
 
@@ -98,12 +106,16 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
     public void surfaceCreated(SurfaceHolder holder) {
         draw();
         start();
+        StateBGMPlay();
     }
 
     /*
      * @see android.view.SurfaceHolder.Callback#surfaceDestroyed(android.view.SurfaceHolder)
      */
     public void surfaceDestroyed(SurfaceHolder holder) {
+        BGMStop();
+        //BGMRelease();
+        //mSoundPool.release();
     }
 
     /**
@@ -121,8 +133,7 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
             case MotionEvent.ACTION_DOWN: //画面上で押下されたとき
                 switch (mGameState) { //ゲームの状態によって処理を振り分ける
                     case OPENING:
-                        //if(NEXUS7_WIDTH/2-150 < x && x < NEXUS7_WIDTH/2+150 && NEXUS7_HEIGHT/2-90 < y && y < NEXUS7_HEIGHT/2-40){ //ボタンの内部
-                        //}
+                        SEPlay(Tap_SE);
                         mPlayer = new Player(this);
                         for(int i = 0; i < EnemyList.size(); i++) { //エネミーのリセット
                             Enemy object = EnemyList.get(i);
@@ -140,6 +151,7 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
                         mPlayer.move(x,y);
                         break;
                     case RESULT:
+                        SEPlay(Tap_SE);
                         StateChange(OPENING);
                         break;
                 }
@@ -160,6 +172,7 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
                     case OPENING:
                         break;
                     case GAMEPLAY:
+                        SEPlay(P_Bullet);
                         mBullet = new Bullet(mPlayer.getPlayerLocation(),mPlayer.getRadian(),40,TYPE_PLAYER);
                         BulletList.add(mBullet);
                         break;
@@ -231,8 +244,10 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
                 mScore = 0;
                 break;
             case GAMEPLAY:
-                if(ScoreRand(mScore/100 + 9500) == 0) { //エネミーのスポーン
+                if(ScoreRand(mScore/100 + 9500) == 0 && EnemyList.size() <= 10) { //エネミーのスポーン
                     long count = mScore / 10000 + 1;
+                    if(count + EnemyList.size() > 10){ count = count - (10 - EnemyList.size()); } //エネミーは10体まで
+                    if(count >= 2 && rand.nextInt(2) == 0) { count = 1;}
                     for (int i = 0; i < count; i++) {
                         int Speed = 3;
                         if(ScoreRand(mScore * 100) == 0){
@@ -255,10 +270,15 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
                     Enemy Enemy = EnemyList.get(i);
                     Rect ERect = Enemy.getEnemyLocation();
                     if(calcDistance(PRect,ERect) < 2f){ //プレイヤーがエネミーに当たった時
+                        SEPlay(P_Destroy);
                         StateChange(RESULT);
                     }
                     if(ScoreRand(mScore * 10) <= 20) { //エネミーの弾発射
-                        if(ScoreRand(mScore) <= mScore/50000) {
+                        if(ScoreRand(mScore * 2) <= mScore/50000) {
+                            if(mScore >= 10000 && rand.nextInt(mScore / 10000) == 0) {
+                                continue;
+                            }
+                            SEPlay(E_Bullet);
                             mBullet = new Bullet(Enemy.getEnemyLocation(), Enemy.getRadian(), 15, TYPE_ENEMY);
                             BulletList.add(mBullet);
                         }
@@ -270,12 +290,14 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
                     int posY = Bullet.getPositionY();
                     Rect BRect = new Rect(posX + 40, posY + 40, 30,30);
                     if(calcDistance(PRect,BRect) < 50f && Bullet.getType() == TYPE_ENEMY){ //プレイヤーが弾に当たった時
+                        SEPlay(P_Destroy);
                         StateChange(RESULT);
                     }
                     for(int j = 0; j < EnemyList.size(); j++) {
                         Enemy Enemy = EnemyList.get(j);
                         Rect ERect = Enemy.getEnemyLocation();
                         if(calcDistance(ERect,BRect) < 50f && Bullet.getType() == TYPE_PLAYER){ //エネミーが弾に当たった時
+                            SEPlay(E_Destroy);
                             EnemyList.remove(Enemy);
                             ScorePlus(200);
                             j--;
@@ -335,11 +357,83 @@ public class ShootingView extends SurfaceView implements Runnable, Callback {
         if(state == RESULT && mScore > mHighScore){
             mHighScore = mScore;
         }
+        StateBGMPlay();
     }
 
     private int ScoreRand(int score){
         int random = 1000 - score / 10;
         if (random <= 30){ random = 30; }
         return rand.nextInt(random);
+    }
+
+    private void SoundInit(){
+        Context context = getContext();
+        mBGM1 = mBGM1.create(context, R.raw.title);
+        mBGM1.setLooping(true);
+        mBGM1.setVolume(1.0f, 1.0f);
+        mBGM2 = mBGM1.create(context, R.raw.gameplay);
+        mBGM2.setLooping(true);
+        mBGM2.setVolume(1.0f, 1.0f);
+        mBGM3 = mBGM1.create(context, R.raw.gameover);
+        mBGM3.setLooping(false);
+        mBGM3.setVolume(1.0f, 1.0f);
+        mSoundPool = new SoundPool(4, AudioManager.STREAM_MUSIC, 0);
+        Tap_SE = mSoundPool.load(context, R.raw.tap_se, 1);
+        P_Bullet = mSoundPool.load(context, R.raw.player_bullet, 1);
+        P_Destroy = mSoundPool.load(context, R.raw.player_destroy, 1);
+        E_Bullet = mSoundPool.load(context, R.raw.enemy_bullet, 1);
+        E_Destroy = mSoundPool.load(context, R.raw.enemy_destroy, 1);
+    }
+
+    /**
+     * BGMを再生する
+     */
+    private void BGMPlay(MediaPlayer mediaPlayer) {
+        BGMStop();
+        if (!mediaPlayer.isPlaying()) {
+            mediaPlayer.seekTo(0);
+            mediaPlayer.start();
+        }
+    }
+
+    private void StateBGMPlay(){
+        if(mGameState == OPENING){
+            BGMPlay(mBGM1);
+        } else if(mGameState == GAMEPLAY){
+            BGMPlay(mBGM2);
+        } else{
+            BGMPlay(mBGM3);
+        }
+    }
+
+    /**
+     * BGMを停止する
+     */
+    private void BGMStop() {
+        if(mBGM1.isPlaying()) {
+            mBGM1.stop();
+            mBGM1.prepareAsync();
+        }
+        if(mBGM2.isPlaying()) {
+            mBGM2.stop();
+            mBGM2.prepareAsync();
+        }
+        if(mBGM3.isPlaying()) {
+            mBGM3.stop();
+            mBGM3.prepareAsync();
+        }
+    }
+
+    private void BGMRelease(){
+        mBGM1.release();
+        mBGM2.release();
+        mBGM3.release();
+    }
+
+    /**
+     * 効果音を再生する
+     */
+    private void SEPlay(int se) {
+        mSoundPool.play(se, 1.0f, 1.0f, 1, 0, 1);
     }
 }
